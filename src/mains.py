@@ -1,11 +1,10 @@
 import cv2
 from ultralytics import YOLO
-#import cvzone
+import cvzone
 import math
 from sort import *  #import sort 
 from datetime import datetime
 import time
-import calibrations
 
 #Stream video from web cam
 #cap = cv2.VideoCapture(0)
@@ -34,7 +33,6 @@ line_x2_b, line_y2_b = 1080, 720
 # cap.set(4,720)
 
 car_positions = {}
-current_car_speed = {}
 
 coco_classes = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat",
@@ -58,10 +56,10 @@ limits = [400,297,673,297]
 # Object Tracker 
 tracker = Sort(max_age=30,min_hits=3, iou_threshold=0.3)
 totalCars = []
+avg_speed = []
 
 carsFromLeft = []
 carsFromRight = []
-avg_speed = []
 while True:
     current_date = today.strftime("%Y-%m-%d")
     current_time = today.strftime("%H:%M:%S")
@@ -118,11 +116,13 @@ while True:
         cv2.circle(frame,(cx,cy),1,(255,0,255),cv2.FILLED)
 
         if line_y1_b < cy < line_y2_b and line_x1_b - 15 < cx < line_x2_b + 15 :
+            exit_time = frame_time
             if carsFromRight.count(id) == 0:
                 carsFromRight.append(id)
 
 
         if  line_y1_a  < cy < line_y2_a  and line_x1_a - 15 < cx < line_x2_a + 15:
+            entry_time = frame_time
             if carsFromLeft.count(id) == 0 :
                 carsFromLeft.append(id)
 
@@ -136,25 +136,24 @@ while True:
             prev_position = car_positions[id]['position']
             prev_timestamp = car_positions[id]['timestamp']
             distance = math.sqrt((prev_position[0] - cx) ** 2 + (prev_position[1] - cy) ** 2)
-            time_diff = frame_time - prev_timestamp
             # Calculate the speed in pixels per second
-            if distance > 5:
-
+            if distance > 18:
+                time_diff = frame_time - prev_timestamp
                 speed = distance / time_diff
-                avg_speed.append(speed)
 
                 # Convert the speed from pixels per second to a more meaningful unit, e.g., km/h or mph
                 # Based on the Assumption that the video represents an Urban District Street of Florida, USA
                 # Where the average speed limit is 35 m/ph
                 # Update the car position, timestamp, and speed
+                avg_speed.append(speed)
                 conversion_factor =  35 / (sum(avg_speed)/len(avg_speed))
                 car_speed_mgh = conversion_factor * speed
-                current_car_speed[id].append(car_speed_mgh)
-                car_speed = sum(current_car_speed[id])/len(current_car_speed[id])
-                car_positions[id] = {'position': (cx, cy), 'timestamp': frame_time, 'speed': car_speed}
+                car_positions[id] = {'position': (cx, cy), 'timestamp': frame_time, 'speed': car_speed_mgh}
             else:
                 car_positions[id] = {'position': (cx, cy), 'timestamp': frame_time, 'speed': 0}
-        label = f'Speed : {car_positions[id]["speed"]:.2f}mph'
+            
+        # Display the speed of the vehicle
+        label = f'Speed : {car_positions[id]["speed"]:.2f}'
         labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
         y1_label = max(y1, labelSize[1] + 10)
         cv2.rectangle(frame, (x1, (y1_label-20) - labelSize[1] - 10), (x1 + labelSize[0], (y1_label-20) + baseLine - 10), (255, 255, 255), cv2.FILLED)
@@ -175,4 +174,4 @@ while True:
    # cap.release()
    # save.release()
 
-    save.release()
+save.release()
